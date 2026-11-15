@@ -1,0 +1,48 @@
+name: Publish Huellas de Vida
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare static site
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || (echo "Missing SUPABASE_PUBLISHABLE_KEY repository secret" && exit 1)
+          mkdir -p _site/src _site/public
+          cp index.html _site/index.html
+          cp -R src/. _site/src/
+          cp -R public/. _site/public/
+          SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" node -e 'require("fs").writeFileSync("_site/config.json", JSON.stringify({supabaseUrl:"https://ifelpxlnlvrbshuovohc.supabase.co",supabaseAnonKey:process.env.SUPABASE_PUBLISHABLE_KEY},null,2))'
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
